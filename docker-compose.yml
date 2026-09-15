@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  packing-list:
+    build: .
+    container_name: PackList2
+    restart: unless-stopped
+    ports:
+      - "8095:3000" # Maps port 8095 on your Unraid server to 3000 in the container
+    volumes:
+      # This maps the data folder to your Unraid appdata share so the list survives updates/reboots
+      - /mnt/user/appdata/PackList2/data:/app/data
+      - /mnt/user/appdata/PackList2/public:/app/public

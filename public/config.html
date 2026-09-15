@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Travelers</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 2rem auto; padding: 0 1rem; background: #f4f4f9; color: #333; line-height: 1.5; }
+        h1, h2 { text-align: center; }
+        .nav { text-align: center; margin-bottom: 20px; }
+        .nav a { display: inline-block; padding: 10px 15px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; }
+        .nav a:hover { background: #5a6268; }
+
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .flex { display: flex; gap: 10px; margin-bottom: 10px; }
+        input[type="text"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; width: 100%; }
+        input[type="text"] { flex: 1; padding: 10px; }
+        button { padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        
+        .traveler-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f4f4f9; padding-bottom: 10px; margin-bottom: 15px; }
+        .traveler-header h3 { margin: 0; }
+        .btn-danger { background: #ff4d4d; padding: 5px 10px; }
+        .btn-danger:hover { background: #cc0000; }
+        
+        ul { list-style: none; padding: 0; margin: 0 0 15px 0; }
+        li { background: #f8f9fa; margin-bottom: 5px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .setting-group { margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 4px; }
+        .setting-group-title { font-weight: bold; margin-bottom: 10px; display: block; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .clothing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .clothing-item label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 3px; color: #555; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="index.html">⬅️ Back to Packing List</a>
+    </div>
+    
+    <h1>⚙️ Configurations</h1>
+
+    <!-- Master Defaults Config -->
+    <div class="card">
+        <h2>🛠️ Master Default Items</h2>
+        <p style="font-size: 0.9em; color: #666; margin-top: 0;">Configure the standard baseline items the generator will always suggest.</p>
+        
+        <div class="setting-group">
+            <span class="setting-group-title">Shared Group Items (Packed once per trip)</span>
+            <ul id="groupDefaultsList"></ul>
+            <div class="flex">
+                <input type="text" id="newGroupDefault" placeholder="Add shared item (e.g. First Aid Kit)...">
+                <button onclick="addDefaultItem('group')">Add</button>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <span class="setting-group-title">Personal Items (Packed for every traveler)</span>
+            <ul id="personalDefaultsList"></ul>
+            <div class="flex">
+                <input type="text" id="newPersonalDefault" placeholder="Add personal item (e.g. Toothbrush)...">
+                <button onclick="addDefaultItem('personal')">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Travelers Config -->
+    <div class="card">
+        <h2>👥 Add a New Traveler</h2>
+        <div class="flex">
+            <input type="text" id="newTravelerName" placeholder="Traveler's Name...">
+            <button onclick="addTraveler()">Add Traveler</button>
+        </div>
+    </div>
+
+    <div id="travelersContainer"></div>
+
+    <script>
+        let config = { travelers: [], defaultGroupItems: [], defaultPersonalItems: [] };
+
+        async function loadConfig() {
+            const res = await fetch('/api/config');
+            config = await res.json();
+            
+            // Seed defaults if they don't exist yet
+            if (!config.defaultGroupItems) config.defaultGroupItems = ["Toothpaste", "Shampoo", "Body Wash", "First Aid Kit", "House Keys"];
+            if (!config.defaultPersonalItems) config.defaultPersonalItems = ["Toothbrush", "Phone Charger"];
+            
+            renderTravelers();
+            renderDefaults();
+        }
+
+        async function saveConfig() {
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+        }
+
+        // --- MASTER DEFAULTS LOGIC ---
+        function renderDefaults() {
+            document.getElementById('groupDefaultsList').innerHTML = config.defaultGroupItems.map((item, index) => `
+                <li>${item} <button class="btn-danger" onclick="deleteDefaultItem('group', ${index})">X</button></li>
+            `).join('');
+
+            document.getElementById('personalDefaultsList').innerHTML = config.defaultPersonalItems.map((item, index) => `
+                <li>${item} <button class="btn-danger" onclick="deleteDefaultItem('personal', ${index})">X</button></li>
+            `).join('');
+        }
+
+        function addDefaultItem(type) {
+            const input = document.getElementById(type === 'group' ? 'newGroupDefault' : 'newPersonalDefault');
+            const item = input.value.trim();
+            if (!item) return;
+
+            if (type === 'group') config.defaultGroupItems.push(item);
+            else config.defaultPersonalItems.push(item);
+            
+            input.value = '';
+            saveConfig().then(renderDefaults);
+        }
+
+        function deleteDefaultItem(type, index) {
+            if (type === 'group') config.defaultGroupItems.splice(index, 1);
+            else config.defaultPersonalItems.splice(index, 1);
+            saveConfig().then(renderDefaults);
+        }
+
+        // --- TRAVELER LOGIC ---
+        function addTraveler() {
+            const input = document.getElementById('newTravelerName');
+            const name = input.value.trim();
+            if (!name) return;
+            
+            config.travelers.push({ 
+                id: Date.now(), 
+                name: name, 
+                wearFrequencies: { shirts: 'normal', pants: 'normal', undies: 'fresh', pjs: 'normal' },
+                customItems: [] 
+            });
+            input.value = '';
+            saveConfig().then(renderTravelers);
+        }
+
+        function deleteTraveler(id) {
+            if(confirm("Remove this traveler entirely?")) {
+                config.travelers = config.travelers.filter(t => t.id !== id);
+                saveConfig().then(renderTravelers);
+            }
+        }
+
+        function updateWearFrequency(id, category, value) {
+            const traveler = config.travelers.find(t => t.id === id);
+            
+            if (!traveler.wearFrequencies) {
+                traveler.wearFrequencies = {
+                    shirts: traveler.wearFrequency === 'grubby' ? 'grubby' : 'normal',
+                    pants: traveler.wearFrequency || 'normal',
+                    undies: 'fresh',
+                    pjs: traveler.wearFrequency || 'normal'
+                };
+            }
+            
+            traveler.wearFrequencies[category] = value;
+            saveConfig();
+        }
+
+        function addCustomItem(travelerId) {
+            const input = document.getElementById(`custom-input-${travelerId}`);
+            const item = input.value.trim();
+            if (!item) return;
+
+            const traveler = config.travelers.find(t => t.id === travelerId);
+            if (!traveler.customItems) traveler.customItems = [];
+            traveler.customItems.push({ id: Date.now(), name: item });
+            input.value = '';
+            saveConfig().then(renderTravelers);
+        }
+
+        function deleteCustomItem(travelerId, itemId) {
+            const traveler = config.travelers.find(t => t.id === travelerId);
+            traveler.customItems = traveler.customItems.filter(i => i.id !== itemId);
+            saveConfig().then(renderTravelers);
+        }
+
+        function renderTravelers() {
+            const container = document.getElementById('travelersContainer');
+            container.innerHTML = '';
+
+            if (config.travelers.length === 0) {
+                container.innerHTML = '<p style="text-align:center;">No travelers configured yet.</p>';
+                return;
+            }
+
+            config.travelers.forEach(t => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                const customItems = t.customItems || [];
+                let itemsHtml = customItems.map(item => `
+                    <li>
+                        ${item.name}
+                        <button class="btn-danger" onclick="deleteCustomItem(${t.id}, ${item.id})">X</button>
+                    </li>
+                `).join('');
+
+                const freqs = t.wearFrequencies || {
+                    shirts: t.wearFrequency === 'grubby' ? 'grubby' : 'normal',
+                    pants: t.wearFrequency || 'normal',
+                    undies: 'fresh',
+                    pjs: t.wearFrequency || 'normal'
+                };
+
+                card.innerHTML = `
+                    <div class="traveler-header">
+                        <h3>${t.name}</h3>
+                        <button class="btn-danger" onclick="deleteTraveler(${t.id})">Delete Profile</button>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <span class="setting-group-title">👕 Clothing Preferences</span>
+                        <div class="clothing-grid">
+                            <div class="clothing-item">
+                                <label>Shirts</label>
+                                <select onchange="updateWearFrequency(${t.id}, 'shirts', this.value)">
+                                    <option value="fresh" ${freqs.shirts === 'fresh' ? 'selected' : ''}>Fresh (1 per day)</option>
+                                    <option value="normal" ${freqs.shirts === 'normal' ? 'selected' : ''}>Normal (1 per day)</option>
+                                    <option value="grubby" ${freqs.shirts === 'grubby' ? 'selected' : ''}>Grubby (1 per 2 days)</option>
+                                </select>
+                            </div>
+                            <div class="clothing-item">
+                                <label>Pants / Shorts</label>
+                                <select onchange="updateWearFrequency(${t.id}, 'pants', this.value)">
+                                    <option value="fresh" ${freqs.pants === 'fresh' ? 'selected' : ''}>Fresh (1 per day)</option>
+                                    <option value="normal" ${freqs.pants === 'normal' ? 'selected' : ''}>Normal (1 per 2 days)</option>
+                                    <option value="grubby" ${freqs.pants === 'grubby' ? 'selected' : ''}>Grubby (1 per 3 days)</option>
+                                </select>
+                            </div>
+                            <div class="clothing-item">
+                                <label>Underwear & Socks</label>
+                                <select onchange="updateWearFrequency(${t.id}, 'undies', this.value)">
+                                    <option value="fresh" ${freqs.undies === 'fresh' ? 'selected' : ''}>Fresh (1/day + spare)</option>
+                                    <option value="normal" ${freqs.undies === 'normal' ? 'selected' : ''}>Normal (1 per day)</option>
+                                    <option value="grubby" ${freqs.undies === 'grubby' ? 'selected' : ''}>Grubby (1 per 2 days)</option>
+                                </select>
+                            </div>
+                            <div class="clothing-item">
+                                <label>Pajamas</label>
+                                <select onchange="updateWearFrequency(${t.id}, 'pjs', this.value)">
+                                    <option value="fresh" ${freqs.pjs === 'fresh' ? 'selected' : ''}>Fresh (1 per 2 days)</option>
+                                    <option value="normal" ${freqs.pjs === 'normal' ? 'selected' : ''}>Normal (1 per 3 days)</option>
+                                    <option value="grubby" ${freqs.pjs === 'grubby' ? 'selected' : ''}>Grubby (1 per trip)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p style="font-size: 0.9em; font-weight: bold; margin-bottom: 5px;">⭐ Custom Must-Have Items:</p>
+                    <ul>${itemsHtml}</ul>
+                    <div class="flex">
+                        <input type="text" id="custom-input-${t.id}" placeholder="Add custom must-have item...">
+                        <button onclick="addCustomItem(${t.id})">Add Item</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        loadConfig();
+    </script>
+</body>
+</html>
