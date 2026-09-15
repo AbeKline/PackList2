@@ -1,6 +1,6 @@
 # 🎒 Smart Packing List
 
-A lightweight, locally-hosted web application for generating and managing smart packing lists. Built with Node.js and plain HTML/JS, it is designed to run flawlessly as a Docker container on Unraid (or any Docker environment) with zero external database dependencies.
+A entirely vibecoded lightweight, locally-hosted web application for generating and managing smart packing lists. Built with Node.js and plain HTML/JS, it is designed to run flawlessly as a Docker container on Unraid (or any Docker environment) with zero external database dependencies.
 
 ## ✨ Features
 
